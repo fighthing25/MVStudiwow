@@ -1,0 +1,22 @@
+name: Build Offline APK Ready
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+      - run: |
+          ls -la
+          echo "Cari folder out/dist/.next"
+          if [ -d "out" ]; then zip -r offline-build.zip out; fi
+          if [ -d "dist" ]; then zip -r offline-build.zip dist; fi
+          if [ -d ".next" ]; then zip -r offline-build.zip .next out 2>/dev/null || zip -r offline-build.zip .next; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: usesuno-offline-build
+          path: offline-build.zip
