@@ -20,63 +20,49 @@ jobs:
       - name: Install deps
         run: npm install
 
-      - name: Build Web (dist)
+      - name: Build Web
         run: npm run build
 
-      - name: Create Electron Main File
+      - name: Create Electron files
         shell: pwsh
         run: |
           @"
           const { app, BrowserWindow } = require('electron');
           const path = require('path');
           function createWindow() {
-            const win = new BrowserWindow({
-              width: 1280,
-              height: 800,
-              webPreferences: { nodeIntegration: false, contextIsolation: true }
-            });
+            const win = new BrowserWindow({ width: 1280, height: 800 });
             win.loadFile(path.join(__dirname, 'dist', 'index.html'));
           }
           app.whenReady().then(createWindow);
-          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-          "@ | Out-File -Encoding utf8 main.js
+          "@ | Set-Content -Path main.js
 
           @"
-          {
-            "name": "mvstudiwow",
-            "version": "1.0.0",
-            "main": "main.js",
-            "build": {
-              "appId": "com.mvstudiwow.app",
-              "productName": "MVStudiwow",
-              "files": ["dist/**/*", "main.js", "package.json"],
-              "win": { "target": "nsis" }
-            }
-          }
-          "@ | Out-File -Encoding utf8 electron-package.json
+          appId: com.mvstudiwow.app
+          productName: MVStudiwow
+          directories:
+            output: release
+            buildResources: build
+          files:
+            - dist/**/*
+            - main.js
+            - package.json
+          win:
+            target: nsis
+            icon: build/icon.ico
+          nsis:
+            oneClick: false
+            allowToChangeInstallationDirectory: true
+          "@ | Set-Content -Path electron-builder.yml
 
-      - name: Install Electron Builder
-        run: |
-          npm install --save-dev electron electron-builder
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $electron = Get-Content electron-package.json | ConvertFrom-Json
-          $pkg.main = $electron.main
-          $pkg.build = $electron.build
-          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
-        shell: pwsh
+          New-Item -ItemType Directory -Force -Path build | Out-Null
 
       - name: Build EXE
-        run: npx electron-builder --win --x64
+        run: |
+          npm install --save-dev electron electron-builder
+          npx electron-builder --config electron-builder.yml --win --x64
 
-      - name: Upload Windows EXE
+      - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: MVStudiwow-Windows-Offline
-          path: dist/*.exe
-          
-      - name: Upload Installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: MVStudiwow-Installer
-          path: dist_electron/**/*.exe
-          if-no-files-found: warn
+          name: MVStudiwow-EXE
+          path: release/*.exe
