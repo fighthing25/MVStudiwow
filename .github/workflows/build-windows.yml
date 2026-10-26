@@ -17,46 +17,66 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install JS deps
+      - name: Install deps
         run: npm install
 
       - name: Build Web (dist)
         run: npm run build
 
-      - name: Init Tauri if missing
+      - name: Create Electron Main File
         shell: pwsh
         run: |
-          if (-Not (Test-Path "src-tauri")) {
-            Write-Host "src-tauri not found, creating..."
-            cargo install tauri-cli --version "^2.0.0" --locked
-            cargo tauri init --app-name MVStudiwow --window-title "MVStudiwow Offline" --dist-dir ../dist --dev-path http://localhost:5173 --before-dev-command "npm run dev" --before-build-command "npm run build" --ci
-          } else {
-            Write-Host "src-tauri exists"
+          @"
+          const { app, BrowserWindow } = require('electron');
+          const path = require('path');
+          function createWindow() {
+            const win = new BrowserWindow({
+              width: 1280,
+              height: 800,
+              webPreferences: { nodeIntegration: false, contextIsolation: true }
+            });
+            win.loadFile(path.join(__dirname, 'dist', 'index.html'));
           }
+          app.whenReady().then(createWindow);
+          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+          "@ | Out-File -Encoding utf8 main.js
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2.0.0" --locked
+          @"
+          {
+            "name": "mvstudiwow",
+            "version": "1.0.0",
+            "main": "main.js",
+            "build": {
+              "appId": "com.mvstudiwow.app",
+              "productName": "MVStudiwow",
+              "files": ["dist/**/*", "main.js", "package.json"],
+              "win": { "target": "nsis" }
+            }
+          }
+          "@ | Out-File -Encoding utf8 electron-package.json
 
-      - name: Patch tauri.conf.json to use dist
-        shell: pwsh
+      - name: Install Electron Builder
         run: |
-          $confPath = "src-tauri/tauri.conf.json"
-          if (Test-Path $confPath) {
-            (Get-Content $confPath) -replace '"distDir":.*', '"distDir": "../dist",' | Set-Content $confPath
-            Write-Host "Patched distDir"
-          }
+          npm install --save-dev electron electron-builder
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $electron = Get-Content electron-package.json | ConvertFrom-Json
+          $pkg.main = $electron.main
+          $pkg.build = $electron.build
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json
+        shell: pwsh
 
       - name: Build EXE
-        run: cargo tauri build
+        run: npx electron-builder --win --x64
 
-      - name: Upload EXE
+      - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
         with:
           name: MVStudiwow-Windows-Offline
-          path: |
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/*.exe
+          path: dist/*.exe
+          
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MVStudiwow-Installer
+          path: dist_electron/**/*.exe
+          if-no-files-found: warn
