@@ -1,0 +1,46 @@
+name: Build Windows Offline App
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web
+        run: npm run build
+
+      - name: Install Tauri CLI
+        run: npm install -D @tauri/cli
+
+      - name: Build Tauri App (.exe)
+        run: npx tauri build
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: MVStudiwow-Windows-Offline
+          path: src-tauri/target/release/bundle/**/*.exe
+          if-no-files-found: warn
+
+      - name: Upload MSI Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: MVStudiwow-Installer
+          path: src-tauri/target/release/bundle/msi/*.msi
