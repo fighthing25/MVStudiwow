@@ -2,8 +2,6 @@ name: Build Windows Offline App
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main, master ]
 
 jobs:
   build-windows:
@@ -34,31 +32,32 @@ jobs:
             win.loadFile(path.join(__dirname, 'dist', 'index.html'));
           }
           app.whenReady().then(createWindow);
-          "@ | Set-Content -Path main.js
+          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+          "@ | Set-Content main.js
+
+          # INI YANG BIKIN ERROR KEMARIN - SEKARANG DIBENERIN
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.main = "main.js"
+          $pkg | ConvertTo-Json -Depth 20 | Set-Content package.json
 
           @"
           appId: com.mvstudiwow.app
           productName: MVStudiwow
           directories:
             output: release
-            buildResources: build
           files:
             - dist/**/*
             - main.js
             - package.json
           win:
             target: nsis
-            icon: build/icon.ico
           nsis:
             oneClick: false
-            allowToChangeInstallationDirectory: true
-          "@ | Set-Content -Path electron-builder.yml
-
-          New-Item -ItemType Directory -Force -Path build | Out-Null
+          "@ | Set-Content electron-builder.yml
 
       - name: Build EXE
         run: |
-          npm install --save-dev electron electron-builder
+          npm install -D electron electron-builder
           npx electron-builder --config electron-builder.yml --win --x64
 
       - name: Upload EXE
