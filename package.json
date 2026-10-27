@@ -47,3 +47,12 @@
   },
   "license": "AGPL-3.0-only"
 }
+{
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "electron": "electron .",
+    "electron:build": "electron-builder --config electron-builder.yml --win --x64"
+  }
+}
