@@ -1,67 +1,20 @@
-name: Build Windows Offline App
-
-on:
+name: Build Windows
+on: 
   workflow_dispatch:
-
+  push:
+    branches: [main, master]
 jobs:
-  build-windows:
+  build:
     runs-on: windows-latest
-
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install deps
-        run: npm install
-
-      - name: Build Web
-        run: npm run build
-
-      - name: Create Electron files
-        shell: pwsh
-        run: |
-          @"
-          const { app, BrowserWindow } = require('electron');
-          const path = require('path');
-          function createWindow() {
-            const win = new BrowserWindow({ width: 1280, height: 800 });
-            win.loadFile(path.join(__dirname, 'dist', 'index.html'));
-          }
-          app.whenReady().then(createWindow);
-          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-          "@ | Set-Content main.js
-
-          # INI YANG BIKIN ERROR KEMARIN - SEKARANG DIBENERIN
-          $pkg = Get-Content package.json | ConvertFrom-Json
-          $pkg.main = "main.js"
-          $pkg | ConvertTo-Json -Depth 20 | Set-Content package.json
-
-          @"
-          appId: com.mvstudiwow.app
-          productName: MVStudiwow
-          directories:
-            output: release
-          files:
-            - dist/**/*
-            - main.js
-            - package.json
-          win:
-            target: nsis
-          nsis:
-            oneClick: false
-          "@ | Set-Content electron-builder.yml
-
-      - name: Build EXE
-        run: |
-          npm install -D electron electron-builder
-          npx electron-builder --config electron-builder.yml --win --x64
-
-      - name: Upload EXE
-        uses: actions/upload-artifact@v4
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+            - run: npm install
+            - run: npm run build
+            - run: npm install -D electron electron-builder
+            - run: npm run electron:build
+            - uses: actions/upload-artifact@v4
         with:
           name: MVStudiwow-EXE
           path: release/*.exe
